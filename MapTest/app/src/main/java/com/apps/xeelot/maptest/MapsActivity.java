@@ -1,8 +1,14 @@
 package com.apps.xeelot.maptest;
 
+import android.content.Context;
 import android.graphics.Color;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationManager;
+import android.nfc.Tag;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -13,6 +19,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -25,10 +34,19 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleMap.OnMapClickListener, GoogleMap.OnMarkerClickListener {
+public class MapsActivity extends FragmentActivity implements
+        OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener,
+        GoogleMap.OnMapClickListener,
+        GoogleMap.OnMarkerClickListener {
 
     private GoogleMap mMap;
     private Circle mCircle;
+    GoogleApiClient googleApiClient;
+    private double mlatitude;
+    private double mlongitude;
+    private Location mLastLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +56,43 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        googleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(LocationServices.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+    }
+
+    @Override
+    protected void onStart() {
+        googleApiClient.connect();
+        super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        googleApiClient.disconnect();
+        super.onStop();
+    }
+
+    @Override
+    public void onConnectionSuspended(int cause) {
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult){
+    }
+
+    @Override
+    public void onConnected(Bundle connectionHint) {
+        mLastLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+        if (mLastLocation != null) {
+            mlatitude = mLastLocation.getLatitude();
+            mlongitude = mLastLocation.getLongitude();
+            LatLng mlatlng = new LatLng(mlatitude, mlongitude);
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(mlatlng, 10));
+        }
     }
 
 
@@ -54,20 +109,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         try {
-            mMap.setMyLocationEnabled(true);
+           mMap.setMyLocationEnabled(true);
         } catch(SecurityException e) {
             e.printStackTrace();
         }
+
         UiSettings ui = mMap.getUiSettings();
         ui.setTiltGesturesEnabled(false);
         ui.setIndoorLevelPickerEnabled(false);
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-        mMap.setOnMapClickListener(this);
-        mMap.setOnMarkerClickListener(this);
+
 
         // Add our single circle
         LatLng latLng = new LatLng(0,0);
@@ -80,6 +131,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Set our custom info window
         mMap.setInfoWindowAdapter(new CustomInfoWindowAdapter());
     }
+
 
 
     class CustomInfoWindowAdapter implements GoogleMap.InfoWindowAdapter, SeekBar.OnSeekBarChangeListener {
@@ -134,8 +186,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         }
     }
-
-
 
 
     @Override
